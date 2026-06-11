@@ -1,0 +1,80 @@
+{
+  "test_cases": [
+    {
+      "id": "tc-001",
+      "name": "校招技术岗从零写简历",
+      "module": "module_1",
+      "description": "用户想从零制作一份校招技术岗简历",
+      "user_input": "我是计算机专业大三学生，想投腾讯后端开发实习，帮我写简历",
+      "user_profile": {
+        "name": "张三",
+        "target_position": "后端开发实习",
+        "target_company": "腾讯",
+        "education": ["北京大学 - 计算机科学 (本科) 2023-2027"],
+        "skills": ["Python", "Java", "Redis", "MySQL", "Git"],
+        "projects": [
+          {
+            "name": "在线商城系统",
+            "description": "使用 Python + FastAPI 开发的电商平台后端，支持商品管理、订单处理、支付对接",
+            "role": "后端开发",
+            "tech_stack": ["Python", "FastAPI", "Redis", "MySQL", "Docker"],
+            "achievements": ["接口响应时间从 500ms 降至 100ms", "支持 1000 并发"]
+          }
+        ]
+      },
+      "truth_sources": [
+        "GitHub: github.com/zhangsan/shop-api",
+        "项目文档: 在线商城系统设计文档"
+      ],
+      "expected": {
+        "has_star_structure": true,
+        "has_quantified_results": true,
+        "word_count_min": 1500,
+        "word_count_max": 2500,
+        "contains_skills": ["Python", "FastAPI", "Redis", "MySQL"],
+        "no_fabrication": true
+      }
+    },
+    {
+      "id": "tc-002",
+      "name": "针对JD优化简历",
+      "module": "module_2",
+      "description": "用户有简历，想针对特定JD优化",
+      "user_input": "我有简历，想针对这个JD优化",
+      "existing_resume": "张三\n北京大学 计算机科学 本科\n\n技术技能：Python, Java, Git\n\n项目经历：在线商城系统 - 使用Python开发后端",
+      "jd_text": "腾讯后端开发实习\n要求：\n- 熟悉 Python/Java\n- 了解 Redis、MySQL\n- 有微服务经验优先\n- 了解 Docker、K8s",
+      "expected": {
+        "matches_jd_keywords": ["Python", "Redis", "MySQL", "Docker"],
+        "has_gap_analysis": true,
+        "has_improvement_suggestions": true
+      }
+    },
+    {
+      "id": "tc-003",
+      "name": "简历诊断",
+      "module": "module_3",
+      "description": "用户想诊断简历问题",
+      "user_input": "帮我看看简历有什么问题",
+      "existing_resume": "张三\n学生\n\n会写代码\n参与了一些项目\n熟悉编程",
+      "expected": {
+        "has_review_report": true,
+        "has_priority_labels": true,
+        "has_specific_suggestions": true,
+        "mentions_improvements": ["STAR结构", "量化成果", "具体技术栈"]
+      }
+    },
+    {
+      "id": "tc-004",
+      "name": "增量更新",
+      "module": "module_4",
+      "description": "用户想修改简历中的项目经历",
+      "user_input": "把在线商城系统的并发数改成2000",
+      "existing_resume": "张三\n\n项目经历：在线商城系统 - 支持1000并发",
+      "expected": {
+        "updates_specified_field": true,
+        "preserves_other_content": true,
+        "shows_diff": true
+      }
+    }
+  ]
+}
