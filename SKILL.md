@@ -156,15 +156,41 @@ display_name_en: "Resume Craft"
 - 技能分层：基于用户描述的项目经历判断，不要自己提升技能等级
 - 项目角色：用户说"参与"就写"参与"，不要升级为"负责"或"主导"
 
-### 1.5 质量保证（强制执行）
+### 1.5 质量保证（强制执行，含交叉审查）
 
 **此阶段不可跳过，除非用户明确说"跳过质量检查"。**
 
-初稿确认后，使用 Agent 工具 spawn 两个子Agent并行执行：
+#### 1.5.1 共享记忆初始化
 
-**子Agent A — 事实核查：**
+质量保证开始前，将以下信息写入 `resume-state.json`（通过 state_manager.py），供所有子Agent读取：
 
-使用 Agent 工具，prompt 如下：
+```bash
+python scripts/state_manager.py update --field resume_draft --value "<用户确认的简历初稿>"
+python scripts/state_manager.py update --field truth_sources --value "<真源数据摘要>"
+python scripts/state_manager.py update --field verification_results --value "[]"
+```
+
+**共享记忆结构**（`resume-state.json` 中的相关字段）：
+
+```json
+{
+  "resume_draft": "当前简历版本",
+  "truth_sources": ["真源1", "真源2"],
+  "verification_results": [
+    {"round": 1, "agent": "fact_checker", "findings": [...], "conclusion": "pass/fail"},
+    {"round": 1, "agent": "interviewer", "findings": [...], "score": 8.5, "factual_doubts": [...]},
+    {"round": 2, "agent": "fact_checker", "cross_check": true, "verified_doubts": [...]}
+  ]
+}
+```
+
+所有子Agent在执行前先读取共享记忆，执行后将结果写回。
+
+#### 1.5.2 第一轮：并行审查
+
+使用 Agent 工具 spawn 两个子Agent**并行执行**：
+
+**子Agent A — 事实核查员：**
 
 ```
 你是一个严格的简历事实核查员。
@@ -172,11 +198,17 @@ display_name_en: "Resume Craft"
 ## 任务
 对比以下简历内容与真源数据，找出所有不一致之处。
 
+## 共享记忆
+先读取 resume-state.json 获取：
+- resume_draft：当前简历版本
+- truth_sources：真源数据
+- verification_results：之前的核查结果（如有）
+
 ## 简历内容
-{用户确认的简历初稿}
+{resume_draft}
 
 ## 真源数据
-{用户提供的真源：项目描述、代码仓库、工作经历等}
+{truth_sources}
 
 ## 核查规则
 加载 references/verification-rules.md，按四维核查（经历/项目/技能/教育）逐项检查。
@@ -187,20 +219,29 @@ display_name_en: "Resume Craft"
 - [疑似夸大] 列表（缺乏证据的描述）
 - [信息缺失] 列表（关键信息遗漏）
 - 核查结论：通过 / 有问题需修正
+
+## 输出后
+将核查结果写入 resume-state.json 的 verification_results 字段：
+python scripts/state_manager.py append --field verification_results --value '{"round":1,"agent":"fact_checker","findings":[...],"conclusion":"pass/fail"}'
 ```
 
-**子Agent B — 面试官盲审：**
-
-使用 Agent 工具，prompt 如下：
+**子Agent B — 面试官盲审员：**
 
 ```
 你是一个有 5 年经验的校招面试官。
 
 ## 任务
 从面试官角度审查这份简历，给出专业评估。
+特别注意：如果你发现任何表述可能涉及事实问题（如数据不合理、描述过度包装），标记为 [事实疑点]，这些疑点将触发事实核查员的二次验证。
+
+## 共享记忆
+先读取 resume-state.json 获取：
+- resume_draft：当前简历版本
+- truth_sources：真源数据（用于辅助判断）
+- verification_results：事实核查员的结果（如有，参考但不依赖）
 
 ## 简历内容
-{用户确认的简历初稿}
+{resume_draft}
 
 ## 目标岗位
 {用户的目标岗位}
@@ -215,13 +256,80 @@ display_name_en: "Resume Craft"
 - [必须修复] 问题列表（附具体修改建议）
 - [建议修改] 问题列表（附具体修改建议）
 - [仅供参考] 问题列表
+- [事实疑点] 列表（疑似事实问题，需事实核查员二次验证）
+  - 示例："声称'性能提升500%'，真源中无此数据支撑"
+  - 示例："项目描述'主导了XX'，但真源显示为'参与'"
 - 总结（一段话的整体评价）
+
+## 输出后
+将审查结果写入 resume-state.json 的 verification_results 字段：
+python scripts/state_manager.py append --field verification_results --value '{"round":1,"agent":"interviewer","findings":[...],"score":8.5,"factual_doubts":["疑点1","疑点2"]}'
+```
+
+#### 1.5.3 第二轮：交叉验证（条件触发）
+
+**触发条件**：子Agent B（面试官）输出了 [事实疑点] 列表且列表非空。
+
+**执行方式**：使用 Agent 工具 spawn 子Agent A（事实核查员），专门验证子Agent B提出的疑点：
+
+```
+你是一个严格的简历事实核查员。
+
+## 任务
+面试官在审查简历时发现了以下事实疑点，请逐一验证。
+
+## 共享记忆
+读取 resume-state.json 获取：
+- resume_draft：当前简历版本
+- truth_sources：真源数据
+- verification_results：第一轮的核查结果
+
+## 面试官提出的事实疑点
+{子Agent B 的 [事实疑点] 列表}
+
+## 验证规则
+对每个疑点：
+1. 对比真源数据，确认是否属实
+2. 如果属实，标注为 [确认夸大] 或 [确认错误]
+3. 如果不属实（面试官误判），标注为 [误判，表述合理]
+
+## 输出格式
+交叉验证结果：
+- [确认错误] 列表（面试官疑点经核查确认为事实错误）
+- [确认夸大] 列表（面试官疑点经核查确认为夸大）
+- [误判] 列表（面试官疑点经核查为合理表述，无需修改）
+- 验证结论：全部合理 / 有问题需修正
+
+## 输出后
+将交叉验证结果写入 verification_results：
+python scripts/state_manager.py append --field verification_results --value '{"round":2,"agent":"fact_checker","cross_check":true,"verified_doubts":[...],"conclusion":"..."}'
+```
+
+#### 1.5.4 结果汇总
+
+将两轮（或三轮）的结果合并，展示给用户：
+
+```
+## 质量检查报告
+
+### 事实核查（第一轮）
+{子Agent A 的核查结果}
+
+### 面试官盲审（第一轮）
+{子Agent B 的审查报告}
+
+### 交叉验证（第二轮，如有）
+{子Agent A 对子Agent B 疑点的验证结果}
+
+### 最终结论
+- [必须修正]：{合并后的问题列表}
+- [建议修改]：{合并后的问题列表}
+- [仅供参考]：{合并后的问题列表}
 ```
 
 **结果处理**：
-- 两个子Agent的结果展示给用户
-- 有 [事实错误] 或 [必须修复] → 回到 1.4 修正，修正后**再次执行质量保证**
-- 只有 [建议修改] 或 [仅供参考] → 在 1.6 优化阶段处理
+- 有 [事实错误] 或 [确认错误] 或 [确认夸大] 或 [必须修复] → 回到 1.4 修正，修正后**再次执行质量保证**（完整流程）
+- 只有 [建议修改] 或 [仅供参考] 或 [误判] → 在 1.6 优化阶段处理
 - 全部通过 → 进入 1.6
 
 **注意**：如果 Agent 工具不可用（如 API 配额已满），在主对话中执行质量检查（效果略差但不可跳过）。告知用户"子Agent不可用，在当前对话中执行质量检查"。
@@ -391,7 +499,7 @@ python scripts/state_manager.py update --field resume_draft --value "<最终简�
 
 **此阶段不可跳过，除非用户明确说"跳过质量检查"。**
 
-同模块一 1.5 的子Agent流程（事实核查 + 面试官盲审）。
+同模块一 1.5 的完整流程（共享记忆初始化 → 并行审查 → 交叉验证 → 结果汇总）。
 
 ### 2.6 输出
 
@@ -481,7 +589,7 @@ python scripts/state_manager.py update --field resume_draft --value "<最终简�
 
 **此阶段不可跳过，除非用户明确说"跳过质量检查"。**
 
-修改完成后，使用 Agent 工具 spawn 子Agent执行质量保证（同模块一 1.5）。
+修改完成后，执行模块一 1.5 的完整质量保证流程（共享记忆 → 并行审查 → 交叉验证 → 结果汇总）。
 
 ### 4.4 一致性检查
 

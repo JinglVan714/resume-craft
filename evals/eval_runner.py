@@ -176,6 +176,40 @@ def check_subtask_routing() -> dict:
     return {"id": "S009", "name": "Sub-task routing", "passed": False, "message": f"missing: {', '.join(missing)}"}
 
 
+def check_cross_review() -> dict:
+    """S010: 检查子Agent交叉审查机制是否定义"""
+    if not SKILL_FILE.exists():
+        return {"id": "S010", "name": "Cross-review", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_cross_review = "交叉审查" in content or "交叉验证" in content
+    has_factual_doubts = "事实疑点" in content
+    has_round2 = "第二轮" in content
+    if has_cross_review and has_factual_doubts and has_round2:
+        return {"id": "S010", "name": "Cross-review", "passed": True, "message": "Cross-review mechanism defined (factual doubts trigger second verification)"}
+    missing = []
+    if not has_cross_review: missing.append("cross-review section")
+    if not has_factual_doubts: missing.append("factual doubts trigger")
+    if not has_round2: missing.append("round 2 verification")
+    return {"id": "S010", "name": "Cross-review", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
+def check_shared_memory() -> dict:
+    """S011: 检查共享记忆层是否定义"""
+    if not SKILL_FILE.exists():
+        return {"id": "S011", "name": "Shared memory", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_shared_memory = "共享记忆" in content
+    has_state_init = "共享记忆初始化" in content or "resume-state.json" in content
+    has_verification_results = "verification_results" in content
+    if has_shared_memory and has_state_init and has_verification_results:
+        return {"id": "S011", "name": "Shared memory", "passed": True, "message": "Shared memory layer defined (state_manager + verification_results)"}
+    missing = []
+    if not has_shared_memory: missing.append("shared memory section")
+    if not has_state_init: missing.append("state initialization")
+    if not has_verification_results: missing.append("verification_results field")
+    return {"id": "S011", "name": "Shared memory", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
 def run_structure_checks() -> dict:
     checks = [
         check_skill_frontmatter(),
@@ -187,6 +221,8 @@ def run_structure_checks() -> dict:
         check_subagent_prompts(),
         check_flow_integrity(),
         check_subtask_routing(),
+        check_cross_review(),
+        check_shared_memory(),
     ]
     passed = sum(1 for c in checks if c["passed"])
     return {
