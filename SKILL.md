@@ -232,8 +232,8 @@ python scripts/state_manager.py update --field verification_results --value "[]"
 ## 真源数据
 {truth_sources}
 
-## 核查规则
-加载 references/verification-rules.md，按五维核查（经历/项目/技能/教育/实现诚实度）逐项检查。
+## 检查规则
+加载 references/verification-rules.md，按五类检查清单（经历/项目/技能/教育/实现诚实度）逐项检查。
 
 ## 实现诚实度核查（重点）
 当简历中出现以下术语时，必须验证实际实现：
