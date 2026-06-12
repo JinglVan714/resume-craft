@@ -210,6 +210,56 @@ def check_shared_memory() -> dict:
     return {"id": "S011", "name": "Shared memory", "passed": False, "message": f"missing: {', '.join(missing)}"}
 
 
+def check_anti_packaging() -> dict:
+    """S012: 检查反包装约束是否定义"""
+    if not SKILL_FILE.exists():
+        return {"id": "S012", "name": "Anti-packaging", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_anti_packaging = "反包装约束" in content
+    has_no_upgrade = "不升级" in content
+    has_confirm = "确认实际实现" in content or "确认实际实现方式" in content
+    if has_anti_packaging and has_no_upgrade and has_confirm:
+        return {"id": "S012", "name": "Anti-packaging", "passed": True, "message": "Anti-packaging constraints defined"}
+    missing = []
+    if not has_anti_packaging: missing.append("anti-packaging section")
+    if not has_no_upgrade: missing.append("no-upgrade rules")
+    if not has_confirm: missing.append("confirmation rules")
+    return {"id": "S012", "name": "Anti-packaging", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
+def check_honesty_dimension() -> dict:
+    """S013: 检查实现诚实度检查类是否定义"""
+    ref_file = REFERENCES_DIR / "verification-rules.md"
+    if not ref_file.exists():
+        return {"id": "S013", "name": "Honesty dimension", "passed": False, "message": "verification-rules.md not found"}
+    content = ref_file.read_text(encoding="utf-8")
+    has_honesty = "实现诚实度" in content
+    has_packaging = "包装过度" in content
+    has_terminology = "术语不匹配" in content
+    if has_honesty and has_packaging and has_terminology:
+        return {"id": "S013", "name": "Honesty dimension", "passed": True, "message": "Implementation honesty check class defined"}
+    missing = []
+    if not has_honesty: missing.append("honesty check class")
+    if not has_packaging: missing.append("[包装过度] label")
+    if not has_terminology: missing.append("[术语不匹配] label")
+    return {"id": "S013", "name": "Honesty dimension", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
+def check_followup_check() -> dict:
+    """S014: 检查可追问性检查是否定义"""
+    if not SKILL_FILE.exists():
+        return {"id": "S014", "name": "Follow-up check", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_followup = "可追问性" in content
+    has_simulate = "模拟面试官追问" in content or "追问1" in content
+    if has_followup and has_simulate:
+        return {"id": "S014", "name": "Follow-up check", "passed": True, "message": "Interview follow-up check defined"}
+    missing = []
+    if not has_followup: missing.append("follow-up check section")
+    if not has_simulate: missing.append("simulated questions")
+    return {"id": "S014", "name": "Follow-up check", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
 def run_structure_checks() -> dict:
     checks = [
         check_skill_frontmatter(),
@@ -223,6 +273,9 @@ def run_structure_checks() -> dict:
         check_subtask_routing(),
         check_cross_review(),
         check_shared_memory(),
+        check_anti_packaging(),
+        check_honesty_dimension(),
+        check_followup_check(),
     ]
     passed = sum(1 for c in checks if c["passed"])
     return {
