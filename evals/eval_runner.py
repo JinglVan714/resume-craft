@@ -144,6 +144,38 @@ def check_subagent_prompts() -> dict:
     return {"id": "S007", "name": "Sub-agent prompts", "passed": False, "message": f"missing: {', '.join(missing)}"}
 
 
+def check_flow_integrity() -> dict:
+    """S008: 检查流程完整性约束是否声明"""
+    if not SKILL_FILE.exists():
+        return {"id": "S008", "name": "Flow integrity", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_constraint = "流程完整性约束" in content
+    has_no_skip = "不得跳过" in content or "不可跳过" in content
+    has_qa_enforce = "质量保证不可省略" in content or "质量保证（强制执行）" in content
+    if has_constraint and has_no_skip and has_qa_enforce:
+        return {"id": "S008", "name": "Flow integrity", "passed": True, "message": "Flow integrity constraints declared"}
+    missing = []
+    if not has_constraint: missing.append("flow integrity section")
+    if not has_no_skip: missing.append("no-skip rule")
+    if not has_qa_enforce: missing.append("QA enforcement")
+    return {"id": "S008", "name": "Flow integrity", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
+def check_subtask_routing() -> dict:
+    """S009: 检查子任务路由是否定义"""
+    if not SKILL_FILE.exists():
+        return {"id": "S009", "name": "Sub-task routing", "passed": False, "message": "SKILL.md not found"}
+    content = SKILL_FILE.read_text(encoding="utf-8")
+    has_routing = "子任务路由" in content
+    has_subtasks = all(k in content for k in ["项目经历", "专业技能", "实习经历", "教育背景"])
+    if has_routing and has_subtasks:
+        return {"id": "S009", "name": "Sub-task routing", "passed": True, "message": "Sub-task routing for 4 sub-parts defined"}
+    missing = []
+    if not has_routing: missing.append("sub-task routing section")
+    if not has_subtasks: missing.append("sub-part definitions")
+    return {"id": "S009", "name": "Sub-task routing", "passed": False, "message": f"missing: {', '.join(missing)}"}
+
+
 def run_structure_checks() -> dict:
     checks = [
         check_skill_frontmatter(),
@@ -153,6 +185,8 @@ def run_structure_checks() -> dict:
         check_red_lines(),
         check_intent_table(),
         check_subagent_prompts(),
+        check_flow_integrity(),
+        check_subtask_routing(),
     ]
     passed = sum(1 for c in checks if c["passed"])
     return {
